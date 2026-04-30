@@ -1,0 +1,19 @@
+llm:
+  provider: ollama
+  config:
+    model: llama3.1:8b
+    base_url: http://localhost:11434
+    temperature: 0.7
+    max_tokens: 1000
+
+embedder:
+  provider: ollama
+  config:
+    model: nomic-embed-text
+    base_url: http://localhost:11434
+
+vectordb:
+  provider: chroma
+  config:
+    dir: ./ambi_db
+    allow_reset: false

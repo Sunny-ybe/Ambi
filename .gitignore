@@ -1,0 +1,19 @@
+# Python
+ambivenv/
+__pycache__/
+*.pyc
+*.pyo
+server/chroma_db/
+server/ambi_v0.db
+ambi_db/
+ambi_memory_log.jsonl
+
+# Node
+node_modules/
+dist/
+
+# macOS
+.DS_Store
+
+# Secrets / local config
+*.local
