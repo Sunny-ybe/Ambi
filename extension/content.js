@@ -2,6 +2,7 @@ const PAGE_METADATA_MESSAGE = "PAGE_METADATA"
 const SEARCH_QUERY_MESSAGE = "SEARCH_QUERY"
 const OPEN_SEARCH_RESULT_MESSAGE = "OPEN_SEARCH_RESULT"
 const TOGGLE_SEARCH_PANEL_MESSAGE = "TOGGLE_SEARCH_PANEL"
+const INGEST_ITEM_MESSAGE = "INGEST_ITEM"
 const PAGE_SNAPSHOT_DEBOUNCE_MS = 300
 const MAX_TEXT_LENGTH = 50_000
 
@@ -664,12 +665,104 @@ function toggleSearchPanel() {
   openSearchPanel()
 }
 
+// ── Twitter / X bookmark scroll capture ──────────────────────────────────────
+
+const twitterIngestedUrls = new Set()
+let twitterIntersectionObserver = null
+let twitterMutationObserver = null
+
+function isOnTwitterBookmarks() {
+  const { hostname, pathname } = window.location
+  return (hostname === "twitter.com" || hostname === "x.com") && pathname.startsWith("/i/bookmarks")
+}
+
+function extractTweetData(article) {
+  const statusLink = article.querySelector('a[href*="/status/"]')
+  if (!statusLink) return null
+
+  const url = statusLink.href
+  if (!url || twitterIngestedUrls.has(url)) return null
+
+  const textEl = article.querySelector('[data-testid="tweetText"]')
+  const text = textEl ? (textEl.innerText || textEl.textContent || "").trim() : ""
+
+  const authorMatch = url.match(/(?:twitter|x)\.com\/([^/]+)\/status\//)
+  const author = authorMatch ? `@${authorMatch[1]}` : ""
+
+  const timeEl = article.querySelector("time")
+  const timestamp = timeEl?.getAttribute("datetime") || new Date().toISOString()
+
+  const title = author
+    ? `${author}: ${text.slice(0, 80)}${text.length > 80 ? "…" : ""}`
+    : text.slice(0, 100) || "Tweet"
+
+  return { url, title, text: text || title, timestamp }
+}
+
+function ingestTweetItem(article) {
+  const data = extractTweetData(article)
+  if (!data) return
+
+  twitterIngestedUrls.add(data.url)
+  chrome.runtime.sendMessage({
+    type: INGEST_ITEM_MESSAGE,
+    payload: {
+      url: data.url,
+      title: data.title,
+      text: data.text,
+      timestamp: data.timestamp,
+      time_spent: 30_000
+    }
+  })
+}
+
+function observeNewTweets() {
+  document.querySelectorAll('article[data-testid="tweet"]').forEach(article => {
+    if (article.dataset.ambiWatched) return
+    article.dataset.ambiWatched = "1"
+    twitterIntersectionObserver.observe(article)
+  })
+}
+
+function setupTwitterBookmarkCapture() {
+  if (!isOnTwitterBookmarks()) return
+  if (twitterIntersectionObserver) return
+
+  twitterIntersectionObserver = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) ingestTweetItem(entry.target)
+    }
+  }, { threshold: 0.5 })
+
+  twitterMutationObserver = new MutationObserver(observeNewTweets)
+  twitterMutationObserver.observe(document.body, { childList: true, subtree: true })
+
+  observeNewTweets()
+}
+
+function teardownTwitterBookmarkCapture() {
+  twitterIntersectionObserver?.disconnect()
+  twitterMutationObserver?.disconnect()
+  twitterIntersectionObserver = null
+  twitterMutationObserver = null
+}
+
+function handleUrlChange() {
+  if (isOnTwitterBookmarks()) {
+    setupTwitterBookmarkCapture()
+  } else {
+    teardownTwitterBookmarkCapture()
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 wrapHistoryMethod("pushState")
 wrapHistoryMethod("replaceState")
 
-window.addEventListener("load", schedulePageSnapshot)
-window.addEventListener("popstate", schedulePageSnapshot)
-window.addEventListener("hashchange", schedulePageSnapshot)
+window.addEventListener("load", () => { schedulePageSnapshot(); handleUrlChange() })
+window.addEventListener("popstate", () => { schedulePageSnapshot(); handleUrlChange() })
+window.addEventListener("hashchange", () => { schedulePageSnapshot(); handleUrlChange() })
 
 const titleObserver = new MutationObserver(() => {
   schedulePageSnapshot()

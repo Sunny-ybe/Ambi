@@ -2,6 +2,7 @@ const PAGE_METADATA_MESSAGE = "PAGE_METADATA"
 const SEARCH_QUERY_MESSAGE = "SEARCH_QUERY"
 const OPEN_SEARCH_RESULT_MESSAGE = "OPEN_SEARCH_RESULT"
 const TOGGLE_SEARCH_PANEL_MESSAGE = "TOGGLE_SEARCH_PANEL"
+const INGEST_ITEM_MESSAGE = "INGEST_ITEM"
 const MINIMUM_DWELL_TIME_MS = 10_000
 const STATE_DEBOUNCE_MS = 200
 const INGEST_API_URL = "http://127.0.0.1:8000/ingest"
@@ -456,6 +457,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message?.type === OPEN_SEARCH_RESULT_MESSAGE) {
     void handleOpenSearchResult(message.url)
+    return
+  }
+
+  if (message?.type === INGEST_ITEM_MESSAGE) {
+    const p = message.payload || {}
+    void postIngestEvent(p, p.time_spent || 30_000)
     return
   }
 })
