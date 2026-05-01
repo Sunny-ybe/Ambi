@@ -3,10 +3,12 @@ const SEARCH_QUERY_MESSAGE = "SEARCH_QUERY"
 const OPEN_SEARCH_RESULT_MESSAGE = "OPEN_SEARCH_RESULT"
 const TOGGLE_SEARCH_PANEL_MESSAGE = "TOGGLE_SEARCH_PANEL"
 const INGEST_ITEM_MESSAGE = "INGEST_ITEM"
+const DELETE_ITEM_MESSAGE = "DELETE_ITEM"
 const MINIMUM_DWELL_TIME_MS = 10_000
 const STATE_DEBOUNCE_MS = 200
 const INGEST_API_URL = "http://127.0.0.1:8000/ingest"
 const SEARCH_API_URL = "http://127.0.0.1:8000/search"
+const DELETE_API_URL = "http://127.0.0.1:8000/delete-by-url"
 
 const STORAGE_KEYS = {
   ACTIVE_SESSION: "dwellActiveSession",
@@ -490,6 +492,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const p = message.payload || {}
     void postIngestEvent(p, p.time_spent || 30_000)
     return
+  }
+
+  if (message?.type === DELETE_ITEM_MESSAGE) {
+    void fetch(DELETE_API_URL, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: message.url })
+    })
+      .then(async (res) => {
+        sendResponse({ ok: res.ok })
+      })
+      .catch(() => {
+        sendResponse({ ok: false })
+      })
+    return true
   }
 })
 

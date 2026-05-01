@@ -3,6 +3,7 @@ const SEARCH_QUERY_MESSAGE = "SEARCH_QUERY"
 const OPEN_SEARCH_RESULT_MESSAGE = "OPEN_SEARCH_RESULT"
 const TOGGLE_SEARCH_PANEL_MESSAGE = "TOGGLE_SEARCH_PANEL"
 const INGEST_ITEM_MESSAGE = "INGEST_ITEM"
+const DELETE_ITEM_MESSAGE = "DELETE_ITEM"
 const PAGE_SNAPSHOT_DEBOUNCE_MS = 300
 const MAX_TEXT_LENGTH = 50_000
 
@@ -285,23 +286,74 @@ function ensureSearchPanel() {
       font-size: 14px;
     }
 
+    .ambi-result-row {
+      position: relative;
+      display: flex;
+      align-items: stretch;
+      border-radius: 18px;
+      transition: background 140ms ease, transform 140ms ease;
+    }
+
+    .ambi-result-row:hover,
+    .ambi-result-row:focus-within {
+      background: rgba(24, 50, 106, 0.08);
+      transform: translateY(-1px);
+    }
+
+    .ambi-result-row:hover .ambi-delete-btn,
+    .ambi-result-row:focus-within .ambi-delete-btn {
+      opacity: 1;
+    }
+
     .ambi-result {
-      width: 100%;
+      flex: 1;
       text-align: left;
       border: 0;
       background: transparent;
       padding: 14px;
       border-radius: 18px;
       cursor: pointer;
-      transition: background 140ms ease, transform 140ms ease;
       color: inherit;
+      min-width: 0;
     }
 
-    .ambi-result:hover,
     .ambi-result:focus-visible {
-      background: rgba(24, 50, 106, 0.08);
-      transform: translateY(-1px);
       outline: none;
+    }
+
+    .ambi-delete-btn {
+      flex-shrink: 0;
+      align-self: center;
+      margin-right: 10px;
+      width: 26px;
+      height: 26px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: #b0b8cc;
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 120ms ease, background 120ms ease, color 120ms ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ambi-delete-btn:hover {
+      background: rgba(200, 60, 60, 0.12);
+      color: #c03c3c;
+    }
+
+    .ambi-delete-btn--deleting {
+      opacity: 1;
+      color: #c03c3c;
+      animation: ambi-spin 0.6s linear infinite;
+    }
+
+    @keyframes ambi-spin {
+      to { transform: rotate(360deg); }
     }
 
     .ambi-result-title {
@@ -565,6 +617,9 @@ function renderResults(responsePayload, filteredItems = null) {
   }
 
   for (const item of items) {
+    const row = document.createElement("div")
+    row.className = "ambi-result-row"
+
     const button = document.createElement("button")
     button.type = "button"
     button.className = "ambi-result"
@@ -585,7 +640,36 @@ function renderResults(responsePayload, filteredItems = null) {
       closeSearchPanel()
     })
 
-    results.append(button)
+    const deleteBtn = document.createElement("button")
+    deleteBtn.type = "button"
+    deleteBtn.className = "ambi-delete-btn"
+    deleteBtn.title = "Remove from memory"
+    deleteBtn.textContent = "×"
+    deleteBtn.addEventListener("click", async (e) => {
+      e.stopPropagation()
+      deleteBtn.classList.add("ambi-delete-btn--deleting")
+      deleteBtn.textContent = "○"
+      try {
+        const response = await chrome.runtime.sendMessage({
+          type: DELETE_ITEM_MESSAGE,
+          url: item.url
+        })
+        if (response?.ok) {
+          row.style.transition = "opacity 200ms ease"
+          row.style.opacity = "0"
+          setTimeout(() => row.remove(), 210)
+        } else {
+          deleteBtn.classList.remove("ambi-delete-btn--deleting")
+          deleteBtn.textContent = "×"
+        }
+      } catch {
+        deleteBtn.classList.remove("ambi-delete-btn--deleting")
+        deleteBtn.textContent = "×"
+      }
+    })
+
+    row.append(button, deleteBtn)
+    results.append(row)
 
     // Deduplicated related items: skip already-shown URLs, max 2 per result
     const related = (item.related || [])
