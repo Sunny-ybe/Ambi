@@ -74,7 +74,21 @@ function extractMainText() {
   }
 }
 
+function isTrackablePage() {
+  const url = window.location.href
+  if (!url || url === "about:blank" || url === "about:newtab") return false
+  if (url.startsWith("chrome://") || url.startsWith("chrome-extension://")) return false
+  if (url.startsWith("about:") || url.startsWith("data:")) return false
+  // Skip pages with no meaningful content
+  const bodyText = document.body?.innerText?.trim() || ""
+  const hasTitle = document.title?.trim().length > 0
+  const hasContent = bodyText.length > 20
+  return hasTitle || hasContent
+}
+
 function sendPageMetadata() {
+  if (!isTrackablePage()) return
+
   const extractedContent = extractMainText()
   const nextPageMetadata = {
     title: extractedContent.title,
