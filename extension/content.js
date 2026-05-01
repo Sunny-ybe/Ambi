@@ -25,6 +25,25 @@ function normalizeText(text = "") {
     .trim()
 }
 
+function isExtensionContextValid() {
+  try {
+    return !!chrome.runtime?.id
+  } catch {
+    return false
+  }
+}
+
+function safeSendMessage(message) {
+  if (!isExtensionContextValid()) return
+  try {
+    chrome.runtime.sendMessage(message)
+  } catch (e) {
+    if (!e?.message?.includes("Extension context invalidated")) {
+      console.error("sendMessage failed:", e)
+    }
+  }
+}
+
 function extractMainText() {
   try {
     if (typeof Readability !== "function") {
@@ -32,6 +51,9 @@ function extractMainText() {
     }
 
     const documentClone = document.cloneNode(true)
+    // Walk the tree and remove any node whose nodeType isn't element/text/comment
+    // to prevent Readability crashing on null-tagName nodes (SVG, custom, etc.)
+    documentClone.querySelectorAll("script, style, noscript, template, svg, math").forEach(el => el.remove())
     const article = new Readability(documentClone).parse()
     const extractedText = normalizeText(article?.textContent || "")
 
@@ -41,8 +63,8 @@ function extractMainText() {
         text: extractedText.slice(0, MAX_TEXT_LENGTH)
       }
     }
-  } catch (error) {
-    console.warn("Readability extraction failed, using fallback text.", error)
+  } catch {
+    // Silently fall through to body.innerText fallback
   }
 
   return {
@@ -69,7 +91,7 @@ function sendPageMetadata() {
 
   lastPageMetadata = nextPageMetadata
 
-  chrome.runtime.sendMessage({
+  safeSendMessage({
     type: PAGE_METADATA_MESSAGE,
     payload: nextPageMetadata
   })
@@ -556,7 +578,7 @@ function renderResults(responsePayload, filteredItems = null) {
     `
 
     button.addEventListener("click", () => {
-      chrome.runtime.sendMessage({
+      safeSendMessage({
         type: OPEN_SEARCH_RESULT_MESSAGE,
         url: item.url
       })
@@ -592,7 +614,7 @@ function renderResults(responsePayload, filteredItems = null) {
           <span class="ambi-related-url">${escapeHtml(truncateUrl(rel.url || ""))}</span>
         `
         relButton.addEventListener("click", () => {
-          chrome.runtime.sendMessage({
+          safeSendMessage({
             type: OPEN_SEARCH_RESULT_MESSAGE,
             url: rel.url
           })
@@ -621,6 +643,10 @@ function scheduleSearch(query) {
   renderStatus("Searching...")
 
   searchDebounceTimer = window.setTimeout(async () => {
+    if (!isExtensionContextValid()) {
+      renderStatus("Extension was reloaded — please refresh this page.")
+      return
+    }
     try {
       const response = await chrome.runtime.sendMessage({
         type: SEARCH_QUERY_MESSAGE,
@@ -704,7 +730,7 @@ function ingestTweetItem(article) {
   if (!data) return
 
   twitterIngestedUrls.add(data.url)
-  chrome.runtime.sendMessage({
+  safeSendMessage({
     type: INGEST_ITEM_MESSAGE,
     payload: {
       url: data.url,
