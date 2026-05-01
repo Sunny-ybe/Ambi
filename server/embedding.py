@@ -98,6 +98,13 @@ def update_centroid(
   return normalize_vector(updated)
 
 
+def delete_document_embedding(record_id: int) -> None:
+  try:
+    get_collection().delete(ids=[str(record_id)])
+  except Exception:
+    pass
+
+
 def fetch_embeddings_by_ids(record_ids: list[int]) -> list[list[float]]:
   """Retrieve stored document embeddings from Chroma by SQLite record IDs."""
   if not record_ids:

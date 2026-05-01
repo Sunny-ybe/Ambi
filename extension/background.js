@@ -173,7 +173,7 @@ async function getDesiredActiveTab(focusedWindowId) {
       windowId: focusedWindowId
     })
 
-    if (!activeTab?.id) {
+    if (!activeTab?.id || activeTab.incognito) {
       return null
     }
 
@@ -318,7 +318,7 @@ async function reconcileActiveSession() {
 }
 
 async function handlePageMetadata(message, sender) {
-  if (!sender.tab?.id) {
+  if (!sender.tab?.id || sender.tab?.incognito) {
     return
   }
 

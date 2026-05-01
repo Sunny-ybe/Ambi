@@ -194,6 +194,22 @@ def set_page_visit_cluster(record_id: int, cluster_id: int,
         connection.commit()
 
 
+def delete_page_visit(record_id: int) -> bool:
+    with get_connection() as connection:
+        cursor = connection.execute(
+            "DELETE FROM page_visits WHERE id = ?", (record_id,)
+        )
+        return cursor.rowcount > 0
+
+
+def fetch_page_visit_by_url(url: str) -> dict[str, Any] | None:
+    with get_connection() as connection:
+        row = connection.execute(
+            "SELECT id, url, title FROM page_visits WHERE url = ?", (url,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
 def fetch_page_visits_by_ids(record_ids: list[int]) -> list[dict[str, Any]]:
     if not record_ids:
         return []

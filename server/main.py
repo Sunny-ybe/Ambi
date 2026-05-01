@@ -4,13 +4,15 @@ import math
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from .db import (
   assign_cluster,
+  delete_page_visit,
   fetch_all_clusters,
   fetch_cluster_details,
+  fetch_page_visit_by_url,
   fetch_page_visits_by_ids,
   fetch_related_by_cluster,
   init_db,
@@ -20,6 +22,7 @@ from .db import (
   upsert_page_visit,
 )
 from .embedding import (
+  delete_document_embedding,
   embed_document,
   initialize_vector_store,
   search_similar_documents,
@@ -294,3 +297,26 @@ def search(payload: SearchRequest) -> dict[str, object]:
     "context_label": context_label,
     "results": top_results,
   }
+
+
+class DeleteByUrlRequest(BaseModel):
+  url: str
+
+
+@app.delete("/delete/{record_id}")
+def delete_by_id(record_id: int) -> dict[str, object]:
+  deleted = delete_page_visit(record_id)
+  if not deleted:
+    raise HTTPException(status_code=404, detail="Record not found.")
+  delete_document_embedding(record_id)
+  return {"deleted": True, "id": record_id}
+
+
+@app.delete("/delete-by-url")
+def delete_by_url(payload: DeleteByUrlRequest) -> dict[str, object]:
+  record = fetch_page_visit_by_url(payload.url)
+  if not record:
+    raise HTTPException(status_code=404, detail="URL not found in memory.")
+  delete_page_visit(record["id"])
+  delete_document_embedding(record["id"])
+  return {"deleted": True, "id": record["id"], "url": record["url"]}
