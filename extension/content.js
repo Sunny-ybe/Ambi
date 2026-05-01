@@ -366,17 +366,11 @@ function ensureSearchPanel() {
       color: #c03c3c;
     }
 
-    .ambi-delete-btn:hover + .ambi-delete-tooltip,
-    .ambi-delete-btn:focus + .ambi-delete-tooltip {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
-
     .ambi-delete-tooltip {
       position: absolute;
       bottom: calc(100% + 6px);
-      left: 50%;
-      transform: translateX(-50%) translateY(4px);
+      right: 0;
+      transform: translateY(4px);
       background: #1a2540;
       color: #fff;
       font-size: 11px;
@@ -389,12 +383,17 @@ function ensureSearchPanel() {
       transition: opacity 120ms ease, transform 120ms ease;
     }
 
+    .ambi-delete-btn:hover + .ambi-delete-tooltip,
+    .ambi-delete-btn:focus + .ambi-delete-tooltip {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
     .ambi-delete-tooltip::after {
       content: "";
       position: absolute;
       top: 100%;
-      left: 50%;
-      transform: translateX(-50%);
+      right: 9px;
       border: 4px solid transparent;
       border-top-color: #1a2540;
     }
@@ -495,8 +494,25 @@ function ensureSearchPanel() {
       margin-bottom: 2px;
     }
 
+    .ambi-related-row {
+      display: flex;
+      align-items: center;
+      border-radius: 10px;
+      transition: background 120ms ease;
+    }
+
+    .ambi-related-row:hover,
+    .ambi-related-row:focus-within {
+      background: rgba(24, 50, 106, 0.06);
+    }
+
+    .ambi-related-row:hover .ambi-delete-wrap,
+    .ambi-related-row:focus-within .ambi-delete-wrap {
+      opacity: 1;
+    }
+
     .ambi-related-item {
-      width: 100%;
+      flex: 1;
       text-align: left;
       border: 0;
       background: transparent;
@@ -505,12 +521,10 @@ function ensureSearchPanel() {
       cursor: pointer;
       color: inherit;
       display: block;
-      transition: background 120ms ease;
+      min-width: 0;
     }
 
-    .ambi-related-item:hover,
     .ambi-related-item:focus-visible {
-      background: rgba(24, 50, 106, 0.06);
       outline: none;
     }
 
@@ -754,6 +768,9 @@ function renderResults(responsePayload, filteredItems = null) {
       relatedContainer.append(relatedLabel)
 
       for (const rel of related) {
+        const relRow = document.createElement("div")
+        relRow.className = "ambi-related-row"
+
         const relButton = document.createElement("button")
         relButton.type = "button"
         relButton.className = "ambi-related-item"
@@ -768,7 +785,46 @@ function renderResults(responsePayload, filteredItems = null) {
           })
           closeSearchPanel()
         })
-        relatedContainer.append(relButton)
+
+        const relDeleteWrap = document.createElement("div")
+        relDeleteWrap.className = "ambi-delete-wrap"
+        relDeleteWrap.style.marginRight = "6px"
+
+        const relDeleteBtn = document.createElement("button")
+        relDeleteBtn.type = "button"
+        relDeleteBtn.className = "ambi-delete-btn"
+        relDeleteBtn.textContent = "×"
+
+        const relDeleteTooltip = document.createElement("span")
+        relDeleteTooltip.className = "ambi-delete-tooltip"
+        relDeleteTooltip.textContent = "Permanently delete this?"
+
+        relDeleteBtn.addEventListener("click", async (e) => {
+          e.stopPropagation()
+          relDeleteBtn.classList.add("ambi-delete-btn--deleting")
+          relDeleteBtn.textContent = "○"
+          try {
+            const response = await chrome.runtime.sendMessage({
+              type: DELETE_ITEM_MESSAGE,
+              url: rel.url
+            })
+            if (response?.ok || response?.status === 404) {
+              relRow.style.transition = "opacity 200ms ease"
+              relRow.style.opacity = "0"
+              setTimeout(() => relRow.remove(), 210)
+            } else {
+              relDeleteBtn.classList.remove("ambi-delete-btn--deleting")
+              relDeleteBtn.textContent = "×"
+            }
+          } catch {
+            relDeleteBtn.classList.remove("ambi-delete-btn--deleting")
+            relDeleteBtn.textContent = "×"
+          }
+        })
+
+        relDeleteWrap.append(relDeleteBtn, relDeleteTooltip)
+        relRow.append(relButton, relDeleteWrap)
+        relatedContainer.append(relRow)
       }
 
       results.append(relatedContainer)
