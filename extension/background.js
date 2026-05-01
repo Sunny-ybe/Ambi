@@ -377,6 +377,17 @@ async function handleSearchQuery(query) {
   return response.json()
 }
 
+function isInjectableUrl(url) {
+  if (!url) return false
+  return (
+    !url.startsWith("chrome://") &&
+    !url.startsWith("chrome-extension://") &&
+    !url.startsWith("https://chrome.google.com/webstore") &&
+    !url.startsWith("about:") &&
+    !url.startsWith("data:")
+  )
+}
+
 async function toggleSearchPanel() {
   try {
     const [activeTab] = await chrome.tabs.query({
@@ -384,13 +395,28 @@ async function toggleSearchPanel() {
       lastFocusedWindow: true
     })
 
-    if (!activeTab?.id) {
+    if (!activeTab?.id || !isInjectableUrl(activeTab.url)) {
       return
     }
 
-    await chrome.tabs.sendMessage(activeTab.id, {
-      type: TOGGLE_SEARCH_PANEL_MESSAGE
-    })
+    try {
+      await chrome.tabs.sendMessage(activeTab.id, {
+        type: TOGGLE_SEARCH_PANEL_MESSAGE
+      })
+    } catch (error) {
+      if (error?.message?.includes("Receiving end does not exist")) {
+        // Tab was open before extension loaded — inject scripts now and retry
+        await chrome.scripting.executeScript({
+          target: { tabId: activeTab.id },
+          files: ["Readability.js", "content.js"]
+        })
+        await chrome.tabs.sendMessage(activeTab.id, {
+          type: TOGGLE_SEARCH_PANEL_MESSAGE
+        })
+      } else {
+        throw error
+      }
+    }
   } catch (error) {
     console.error("Unable to toggle the Ambi search panel:", error)
   }
