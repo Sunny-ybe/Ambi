@@ -300,10 +300,6 @@ function ensureSearchPanel() {
       transform: translateY(-1px);
     }
 
-    .ambi-result-row:hover .ambi-delete-btn,
-    .ambi-result-row:focus-within .ambi-delete-btn {
-      opacity: 1;
-    }
 
     .ambi-result {
       flex: 1;
@@ -321,10 +317,21 @@ function ensureSearchPanel() {
       outline: none;
     }
 
-    .ambi-delete-btn {
+    .ambi-delete-wrap {
       flex-shrink: 0;
       align-self: center;
       margin-right: 10px;
+      position: relative;
+      opacity: 0;
+      transition: opacity 120ms ease;
+    }
+
+    .ambi-result-row:hover .ambi-delete-wrap,
+    .ambi-result-row:focus-within .ambi-delete-wrap {
+      opacity: 1;
+    }
+
+    .ambi-delete-btn {
       width: 26px;
       height: 26px;
       border: 0;
@@ -334,8 +341,7 @@ function ensureSearchPanel() {
       font-size: 16px;
       line-height: 1;
       cursor: pointer;
-      opacity: 0;
-      transition: opacity 120ms ease, background 120ms ease, color 120ms ease;
+      transition: background 120ms ease, color 120ms ease;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -346,8 +352,40 @@ function ensureSearchPanel() {
       color: #c03c3c;
     }
 
-    .ambi-delete-btn--deleting {
+    .ambi-delete-btn:hover + .ambi-delete-tooltip,
+    .ambi-delete-btn:focus + .ambi-delete-tooltip {
       opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .ambi-delete-tooltip {
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%) translateY(4px);
+      background: #1a2540;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 500;
+      white-space: nowrap;
+      padding: 4px 8px;
+      border-radius: 6px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 120ms ease, transform 120ms ease;
+    }
+
+    .ambi-delete-tooltip::after {
+      content: "";
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 4px solid transparent;
+      border-top-color: #1a2540;
+    }
+
+    .ambi-delete-btn--deleting {
       color: #c03c3c;
       animation: ambi-spin 0.6s linear infinite;
     }
@@ -640,24 +678,35 @@ function renderResults(responsePayload, filteredItems = null) {
       closeSearchPanel()
     })
 
+    const deleteWrap = document.createElement("div")
+    deleteWrap.className = "ambi-delete-wrap"
+
     const deleteBtn = document.createElement("button")
     deleteBtn.type = "button"
     deleteBtn.className = "ambi-delete-btn"
-    deleteBtn.title = "Remove from memory"
     deleteBtn.textContent = "×"
+
+    const deleteTooltip = document.createElement("span")
+    deleteTooltip.className = "ambi-delete-tooltip"
+    deleteTooltip.textContent = "Permanently delete this?"
+
     deleteBtn.addEventListener("click", async (e) => {
       e.stopPropagation()
       deleteBtn.classList.add("ambi-delete-btn--deleting")
       deleteBtn.textContent = "○"
+      const fadeOut = () => {
+        row.style.transition = "opacity 200ms ease"
+        row.style.opacity = "0"
+        setTimeout(() => row.remove(), 210)
+      }
       try {
         const response = await chrome.runtime.sendMessage({
           type: DELETE_ITEM_MESSAGE,
           url: item.url
         })
-        if (response?.ok) {
-          row.style.transition = "opacity 200ms ease"
-          row.style.opacity = "0"
-          setTimeout(() => row.remove(), 210)
+        // ok=true means deleted; ok=false with 404 means already gone — remove either way
+        if (response?.ok || response?.status === 404) {
+          fadeOut()
         } else {
           deleteBtn.classList.remove("ambi-delete-btn--deleting")
           deleteBtn.textContent = "×"
@@ -668,7 +717,8 @@ function renderResults(responsePayload, filteredItems = null) {
       }
     })
 
-    row.append(button, deleteBtn)
+    deleteWrap.append(deleteBtn, deleteTooltip)
+    row.append(button, deleteWrap)
     results.append(row)
 
     // Deduplicated related items: skip already-shown URLs, max 2 per result

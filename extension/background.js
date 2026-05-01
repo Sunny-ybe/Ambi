@@ -501,7 +501,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       body: JSON.stringify({ url: message.url })
     })
       .then(async (res) => {
-        sendResponse({ ok: res.ok })
+        sendResponse({ ok: res.ok, status: res.status })
       })
       .catch(() => {
         sendResponse({ ok: false })
