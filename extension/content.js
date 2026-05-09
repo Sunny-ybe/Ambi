@@ -985,6 +985,48 @@ function handleUrlChange() {
   }
 }
 
+// ── Clipboard capture ─────────────────────────────────────────────────────────
+
+const CLIPBOARD_SENSITIVE_PATTERNS = [
+  /\b\d[\d\s\-]{11,17}\d\b/,                                      // credit card (13–19 digits)
+  /\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b/,                             // SSN
+  /(sk-|ghp_|xoxb-|glpat-|Bearer\s+)\S{10,}/i,                   // API keys / tokens
+  /\b(password|passwd|secret|api[_\s]?key)\s*[:=]\s*\S+/i        // credential assignment
+]
+
+function isUsefulClipboardText(text) {
+  const trimmed = text.trim()
+  if (trimmed.length < 40 || trimmed.length > 4000) return false
+  if (!/\s/.test(trimmed)) return false
+  if (/^https?:\/\/\S+$/.test(trimmed)) return false
+  const alphaCount = (trimmed.match(/[a-zA-Z]/g) || []).length
+  if (alphaCount / trimmed.length < 0.4) return false
+  for (const pattern of CLIPBOARD_SENSITIVE_PATTERNS) {
+    if (pattern.test(trimmed)) return false
+  }
+  return true
+}
+
+function handleClipboardCopy(event) {
+  if (!isExtensionContextValid()) return
+  const text = event.clipboardData?.getData("text/plain") || ""
+  if (!isUsefulClipboardText(text)) return
+  const hostname = window.location.hostname || "unknown"
+  const title = `Copied from ${document.title || hostname}`
+  safeSendMessage({
+    type: INGEST_ITEM_MESSAGE,
+    payload: {
+      url: `clipboard://${hostname}/${Date.now()}`,
+      title,
+      text: text.trim(),
+      timestamp: new Date().toISOString(),
+      time_spent: 30_000
+    }
+  })
+}
+
+document.addEventListener("copy", handleClipboardCopy)
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 wrapHistoryMethod("pushState")
