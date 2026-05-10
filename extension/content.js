@@ -762,42 +762,21 @@ async function renderLinksPanel() {
   // Accordion
   for (const [domain, domainLinks] of sortedGroups) {
     const isExpanded = linksExpandedDomains.has(domain)
-    const { domainRow, headerEl } = buildDomainRow(domain, domainLinks, isExpanded)
+    const sorted = [...domainLinks].sort((a, b) => {
+      if (a.pinned && !b.pinned) return -1
+      if (!a.pinned && b.pinned) return 1
+      return scoreLink(b) - scoreLink(a)
+    })
+    const visible = sorted.slice(0, LINKS_MAX_PER_DOMAIN)
+    const hidden = sorted.slice(LINKS_MAX_PER_DOMAIN)
+    const { domainRow, headerEl, subRows } = buildDomainRow(domain, domainLinks, isExpanded, visible, hidden)
     linksVisibleRows.push({ el: headerEl, type: "domain", domain })
-    linksBody.append(domainRow)
-
     if (isExpanded) {
-      const sorted = [...domainLinks].sort((a, b) => {
-        if (a.pinned && !b.pinned) return -1
-        if (!a.pinned && b.pinned) return 1
-        return scoreLink(b) - scoreLink(a)
-      })
-      const visible = sorted.slice(0, LINKS_MAX_PER_DOMAIN)
-      const hidden = sorted.slice(LINKS_MAX_PER_DOMAIN)
-
-      for (let i = 0; i < visible.length; i++) {
-        const link = visible[i]
-        const isLast = i === visible.length - 1 && hidden.length === 0
-        const subRow = buildSubLinkRow(link, false, isLast)
-        linksVisibleRows.push({ el: subRow, type: "link", link })
-        domainRow.append(subRow)
-      }
-
-      if (hidden.length > 0) {
-        const showMore = document.createElement("button")
-        showMore.type = "button"
-        showMore.className = "ambi-show-more"
-        showMore.textContent = `Show ${hidden.length} more`
-        showMore.addEventListener("click", () => {
-          for (const link of hidden) {
-            const subRow = buildSubLinkRow(link, false, false)
-            domainRow.insertBefore(subRow, showMore)
-          }
-          showMore.remove()
-        })
-        domainRow.append(showMore)
+      for (const { el, link } of subRows) {
+        linksVisibleRows.push({ el, type: "link", link })
       }
     }
+    linksBody.append(domainRow)
   }
 
   if (displayed.length === 0) {
@@ -811,7 +790,7 @@ async function renderLinksPanel() {
   updateLinksFocus(-1)
 }
 
-function buildDomainRow(domain, links, isExpanded) {
+function buildDomainRow(domain, links, isExpanded, visibleLinks, hiddenLinks) {
   const domainRow = document.createElement("div")
   domainRow.className = "ambi-domain-row" + (isExpanded ? " ambi-domain-row--expanded" : "")
 
@@ -843,28 +822,76 @@ function buildDomainRow(domain, links, isExpanded) {
   arrow.textContent = "▶"
 
   headerEl.append(favicon, domainName, countEl, arrow)
-  domainRow.append(headerEl)
 
-  headerEl.addEventListener("click", () => toggleDomain(domain, domainRow))
+  // Sub-links always in DOM; toggled via display so no async re-render needed
+  const subContainer = document.createElement("div")
+  subContainer.style.display = isExpanded ? "" : "none"
 
-  return { domainRow, headerEl }
+  const subRows = []
+  for (let i = 0; i < visibleLinks.length; i++) {
+    const link = visibleLinks[i]
+    const isLast = i === visibleLinks.length - 1 && hiddenLinks.length === 0
+    const subRow = buildSubLinkRow(link, false, isLast)
+    subRows.push({ el: subRow, link })
+    subContainer.append(subRow)
+  }
+
+  if (hiddenLinks.length > 0) {
+    const showMore = document.createElement("button")
+    showMore.type = "button"
+    showMore.className = "ambi-show-more"
+    showMore.textContent = `Show ${hiddenLinks.length} more`
+    showMore.addEventListener("click", e => {
+      e.stopPropagation()
+      for (const link of hiddenLinks) {
+        const subRow = buildSubLinkRow(link, false, false)
+        subRows.push({ el: subRow, link })
+        subContainer.insertBefore(subRow, showMore)
+      }
+      showMore.remove()
+      rebuildLinksVisibleRows()
+    })
+    subContainer.append(showMore)
+  }
+
+  headerEl.addEventListener("click", () => {
+    const expanding = !linksExpandedDomains.has(domain)
+    if (expanding) {
+      linksExpandedDomains.add(domain)
+      domainRow.classList.add("ambi-domain-row--expanded")
+    } else {
+      linksExpandedDomains.delete(domain)
+      domainRow.classList.remove("ambi-domain-row--expanded")
+    }
+    subContainer.style.display = expanding ? "" : "none"
+    rebuildLinksVisibleRows()
+  })
+
+  domainRow._domain = domain
+  domainRow.append(headerEl, subContainer)
+
+  return { domainRow, headerEl, subRows }
 }
 
-function toggleDomain(domain, domainRow) {
-  if (linksExpandedDomains.has(domain)) {
-    linksExpandedDomains.delete(domain)
-  } else {
-    linksExpandedDomains.add(domain)
+function rebuildLinksVisibleRows() {
+  const { linksBody } = ensurePanel()
+  linksVisibleRows = []
+  for (const child of linksBody.children) {
+    if (!child.classList?.contains("ambi-domain-row")) continue
+    const headerEl = child.querySelector(".ambi-domain-header")
+    if (headerEl) linksVisibleRows.push({ el: headerEl, type: "domain", domain: child._domain })
+    if (child.classList.contains("ambi-domain-row--expanded")) {
+      for (const subRow of child.querySelectorAll(".ambi-sub-link-row")) {
+        linksVisibleRows.push({ el: subRow, type: "link", link: subRow._link })
+      }
+    }
   }
-  void renderLinksPanel()
 }
 
 function buildSubLinkRow(link, isPinnedSection, isLast = false) {
   const row = document.createElement("div")
   row.className = "ambi-sub-link-row"
-
-  const subLinks = document.createElement("div")
-  subLinks.className = "ambi-sub-links"
+  row._link = link
   if (!isPinnedSection) row.style.paddingLeft = "28px"
 
   const treeIndicator = document.createElement("span")
