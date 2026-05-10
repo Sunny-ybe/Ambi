@@ -875,7 +875,7 @@ function buildSubLinkRow(link, isPinnedSection, isLast = false) {
   btn.type = "button"
   btn.className = "ambi-sub-link-btn"
   btn.addEventListener("click", () => {
-    chrome.tabs.create({ url: link.url })
+    safeSendMessage({ type: OPEN_SEARCH_RESULT_MESSAGE, url: link.url })
     closePanel()
   })
 
@@ -1019,7 +1019,7 @@ function handleLinksKeydown(event) {
       toggleDomain(row.domain)
       void renderLinksPanel().then(() => updateLinksFocus(linksFocusIndex))
     } else if (row?.type === "link") {
-      chrome.tabs.create({ url: row.link.url })
+      safeSendMessage({ type: OPEN_SEARCH_RESULT_MESSAGE, url: row.link.url })
       closePanel()
     }
     return
