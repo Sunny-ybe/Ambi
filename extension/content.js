@@ -879,6 +879,19 @@ function buildSubLinkRow(link, isPinnedSection, isLast = false) {
     closePanel()
   })
 
+  if (isPinnedSection) {
+    const fav = document.createElement("img")
+    fav.className = "ambi-domain-favicon"
+    fav.src = link.favicon || `https://www.google.com/s2/favicons?domain=${getLinkHostname(link.url)}&sz=32`
+    fav.onerror = function () {
+      const fallback = document.createElement("div")
+      fallback.className = "ambi-domain-favicon-fallback"
+      fallback.textContent = getLinkHostname(link.url)[0]?.toUpperCase() || "?"
+      this.replaceWith(fallback)
+    }
+    btn.append(fav)
+  }
+
   if (link.pinned && !isPinnedSection) {
     const dot = document.createElement("span")
     dot.className = "ambi-pinned-dot"
