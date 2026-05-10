@@ -1,0 +1,752 @@
+:host {
+  all: initial;
+}
+
+.ambi-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483646;
+  display: none;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(10px);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+}
+
+.ambi-backdrop[data-open="true"] {
+  display: block;
+}
+
+@keyframes ambi-panel-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ── Panel shell ── */
+
+.ambi-panel {
+  margin: 72px auto 0;
+  overflow: hidden;
+  animation: ambi-panel-in 220ms cubic-bezier(0.34, 1.4, 0.64, 1) forwards;
+}
+
+.ambi-backdrop[data-mode="context"] .ambi-panel {
+  width: min(720px, calc(100vw - 32px));
+  border: 1px solid rgba(20, 35, 64, 0.12);
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgba(252, 249, 240, 0.98), rgba(245, 247, 255, 0.98));
+  box-shadow: 0 24px 80px rgba(11, 19, 41, 0.18), 0 4px 18px rgba(11, 19, 41, 0.08);
+  color: #11213e;
+}
+
+.ambi-backdrop[data-mode="links"] .ambi-panel {
+  width: min(660px, calc(100vw - 32px));
+  border: 0.5px solid rgba(255, 255, 255, 0.09);
+  border-radius: 16px;
+  background: #0f0f11;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6), 0 4px 18px rgba(0, 0, 0, 0.4);
+  color: rgba(255, 255, 255, 0.85);
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Tab switcher ── */
+
+.ambi-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 10px 12px 0;
+}
+
+.ambi-tab {
+  border: 0;
+  background: transparent;
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.ambi-backdrop[data-mode="context"] .ambi-tab {
+  color: #6c7a99;
+}
+
+.ambi-backdrop[data-mode="context"] .ambi-tab[data-tab="context"],
+.ambi-backdrop[data-mode="links"] .ambi-tab[data-tab="links"] {
+  background: rgba(255, 255, 255, 0.92);
+  color: #0f0f11;
+}
+
+.ambi-backdrop[data-mode="links"] .ambi-tab {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.ambi-backdrop[data-mode="links"] .ambi-tab:hover {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* ── Views ── */
+
+.ambi-view { display: none; }
+.ambi-backdrop[data-mode="context"] .ambi-view--context { display: block; }
+.ambi-backdrop[data-mode="links"] .ambi-view--links {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── Context view styles ── */
+
+.ambi-header {
+  padding: 12px 18px 12px;
+  border-bottom: 1px solid rgba(20, 35, 64, 0.08);
+}
+
+.ambi-title {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #6c7a99;
+}
+
+.ambi-input {
+  width: 100%;
+  border: 0;
+  outline: none;
+  background: rgba(255, 255, 255, 0.75);
+  border-radius: 16px;
+  padding: 16px 18px;
+  box-sizing: border-box;
+  font-size: 18px;
+  color: #11213e;
+  box-shadow: inset 0 0 0 1px rgba(17, 33, 62, 0.08);
+}
+
+.ambi-input::placeholder { color: #93a0bb; }
+
+.ambi-results {
+  max-height: min(70vh, 560px);
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.ambi-empty,
+.ambi-status {
+  padding: 22px 18px;
+  color: #5d6985;
+  font-size: 14px;
+}
+
+.ambi-result-row {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  border-radius: 18px;
+  transition: background 140ms ease, transform 140ms ease;
+}
+
+.ambi-result-row:hover,
+.ambi-result-row:focus-within {
+  background: rgba(24, 50, 106, 0.08);
+  transform: translateY(-1px);
+}
+
+.ambi-result {
+  flex: 1;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 14px;
+  border-radius: 18px;
+  cursor: pointer;
+  color: inherit;
+  min-width: 0;
+}
+
+.ambi-result:focus-visible { outline: none; }
+
+.ambi-delete-wrap {
+  flex-shrink: 0;
+  align-self: center;
+  margin-right: 10px;
+  position: relative;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.ambi-result-row:hover .ambi-delete-wrap,
+.ambi-result-row:focus-within .ambi-delete-wrap {
+  opacity: 1;
+}
+
+.ambi-delete-btn {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #b0b8cc;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ambi-delete-btn:hover {
+  background: rgba(200, 60, 60, 0.12);
+  color: #c03c3c;
+}
+
+.ambi-delete-tooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  transform: translateY(4px);
+  background: #1a2540;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: 4px 8px;
+  border-radius: 6px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.ambi-delete-btn:hover + .ambi-delete-tooltip,
+.ambi-delete-btn:focus + .ambi-delete-tooltip {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.ambi-delete-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  right: 9px;
+  border: 4px solid transparent;
+  border-top-color: #1a2540;
+}
+
+.ambi-delete-btn--deleting {
+  color: #c03c3c;
+  animation: ambi-spin 0.6s linear infinite;
+}
+
+@keyframes ambi-spin { to { transform: rotate(360deg); } }
+
+.ambi-result-title {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #102348;
+}
+
+.ambi-result-snippet {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #41506e;
+}
+
+.ambi-result-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: #6b7790;
+}
+
+.ambi-result-url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 70%;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.ambi-result-meta {
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.ambi-context-header {
+  padding: 8px 14px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #7b6faa;
+  cursor: pointer;
+  border-radius: 10px;
+  transition: background 120ms ease, color 120ms ease;
+  user-select: none;
+}
+
+.ambi-context-header:hover {
+  background: rgba(123, 111, 170, 0.10);
+  color: #5a4f8a;
+}
+
+.ambi-context-header--active {
+  background: rgba(123, 111, 170, 0.14);
+  color: #5a4f8a;
+}
+
+.ambi-context-header--active::after {
+  content: " ×";
+  font-size: 13px;
+  font-weight: 700;
+  opacity: 0.6;
+}
+
+.ambi-related {
+  margin: 2px 0 4px 14px;
+  border-left: 2px solid rgba(123, 111, 170, 0.22);
+  padding-left: 10px;
+}
+
+.ambi-related-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #a0a8be;
+  padding: 4px 6px 2px;
+  margin-bottom: 2px;
+}
+
+.ambi-related-row {
+  display: flex;
+  align-items: center;
+  border-radius: 10px;
+  transition: background 120ms ease;
+}
+
+.ambi-related-row:hover,
+.ambi-related-row:focus-within {
+  background: rgba(24, 50, 106, 0.06);
+}
+
+.ambi-related-row:hover .ambi-delete-wrap,
+.ambi-related-row:focus-within .ambi-delete-wrap {
+  opacity: 1;
+}
+
+.ambi-related-item {
+  flex: 1;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 5px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  color: inherit;
+  display: block;
+  min-width: 0;
+}
+
+.ambi-related-item:focus-visible { outline: none; }
+
+.ambi-related-title {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: #4a5878;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ambi-related-url {
+  display: block;
+  font-size: 10px;
+  color: #9aa4bc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+/* ── Links view ── */
+
+.ambi-links-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.ambi-links-search-icon {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.25);
+  flex-shrink: 0;
+}
+
+.ambi-links-input {
+  flex: 1;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.85);
+  font-family: inherit;
+}
+
+.ambi-links-input::placeholder { color: rgba(255, 255, 255, 0.22); }
+
+.ambi-links-shortcut {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-family: inherit;
+  color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  padding: 2px 6px;
+}
+
+/* Category tabs */
+
+.ambi-cat-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 8px 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  flex-shrink: 0;
+}
+
+.ambi-cat-tabs::-webkit-scrollbar { display: none; }
+
+.ambi-cat-tab {
+  flex-shrink: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 120ms ease, color 120ms ease;
+  font-family: inherit;
+}
+
+.ambi-cat-tab:hover { color: rgba(255, 255, 255, 0.7); }
+
+.ambi-cat-tab--active {
+  background: rgba(255, 255, 255, 0.92);
+  color: #0f0f11;
+  font-weight: 600;
+}
+
+/* Links body */
+
+.ambi-links-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 8px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+.ambi-links-body::-webkit-scrollbar { width: 4px; }
+.ambi-links-body::-webkit-scrollbar-track { background: transparent; }
+.ambi-links-body::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 2px; }
+
+/* Pinned section */
+
+.ambi-pinned-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.22);
+  padding: 6px 8px 4px;
+}
+
+/* Domain row */
+
+.ambi-domain-row {
+  border-radius: 10px;
+  margin-bottom: 2px;
+  overflow: hidden;
+}
+
+.ambi-domain-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 120ms ease;
+  user-select: none;
+}
+
+.ambi-domain-header:hover { background: #18181b; }
+
+.ambi-domain-favicon {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.ambi-domain-favicon-fallback {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.ambi-domain-name {
+  flex: 1;
+  font-size: 12px;
+  font-family: "SF Mono", "Fira Code", monospace;
+  color: rgba(255, 255, 255, 0.25);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ambi-domain-count {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.22);
+  flex-shrink: 0;
+}
+
+.ambi-domain-arrow {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.25);
+  flex-shrink: 0;
+  transition: transform 150ms ease;
+}
+
+.ambi-domain-row--expanded .ambi-domain-arrow {
+  transform: rotate(90deg);
+}
+
+/* Sub-link rows */
+
+.ambi-sub-links {
+  padding: 0 0 4px 36px;
+}
+
+.ambi-sub-link-row {
+  display: flex;
+  align-items: center;
+  border-radius: 8px;
+  transition: background 120ms ease;
+  position: relative;
+}
+
+.ambi-sub-link-row:hover { background: #1e1e22; }
+
+.ambi-sub-link-tree {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
+  width: 14px;
+  margin-right: 4px;
+}
+
+.ambi-sub-link-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  padding: 7px 6px;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font-family: inherit;
+  min-width: 0;
+  border-radius: 8px;
+}
+
+.ambi-sub-link-title {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.ambi-sub-link-domain {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.22);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ambi-pinned-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.35);
+  flex-shrink: 0;
+  margin-right: 2px;
+}
+
+/* Hover actions on sub-link rows */
+
+.ambi-sub-link-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 100ms ease;
+  flex-shrink: 0;
+  padding-right: 6px;
+}
+
+.ambi-sub-link-row:hover .ambi-sub-link-actions { opacity: 1; }
+
+.ambi-sub-action-btn {
+  width: 22px;
+  height: 22px;
+  border: 0;
+  background: transparent;
+  border-radius: 5px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 100ms ease, color 100ms ease;
+  font-family: inherit;
+}
+
+.ambi-sub-action-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.ambi-sub-action-btn--delete:hover {
+  background: rgba(200, 60, 60, 0.15);
+  color: #e05555;
+}
+
+.ambi-sub-action-btn--pinned {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Show more */
+
+.ambi-show-more {
+  border: 0;
+  background: transparent;
+  padding: 5px 8px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  border-radius: 6px;
+  font-family: inherit;
+  transition: color 120ms ease;
+}
+
+.ambi-show-more:hover { color: rgba(255, 255, 255, 0.6); }
+
+/* Focus ring for keyboard nav */
+
+.ambi-domain-header--focused { background: #18181b; }
+.ambi-sub-link-row--focused { background: #1e1e22; }
+.ambi-sub-link-row--focused .ambi-sub-link-actions { opacity: 1; }
+
+/* Empty state */
+
+.ambi-links-empty {
+  padding: 32px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.22);
+}
+
+/* Footer */
+
+.ambi-links-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  flex-shrink: 0;
+}
+
+.ambi-links-count {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.22);
+}
+
+.ambi-footer-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.ambi-copy-btn {
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  background: transparent;
+  border-radius: 7px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease;
+  font-family: inherit;
+}
+
+.ambi-copy-btn:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.ambi-inject-btn {
+  border: 0;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 7px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #0f0f11;
+  cursor: pointer;
+  transition: background 120ms ease;
+  font-family: inherit;
+}
+
+.ambi-inject-btn:hover { background: #fff; }

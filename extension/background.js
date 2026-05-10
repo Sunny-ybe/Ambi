@@ -4,6 +4,143 @@ const OPEN_SEARCH_RESULT_MESSAGE = "OPEN_SEARCH_RESULT"
 const TOGGLE_SEARCH_PANEL_MESSAGE = "TOGGLE_SEARCH_PANEL"
 const INGEST_ITEM_MESSAGE = "INGEST_ITEM"
 const DELETE_ITEM_MESSAGE = "DELETE_ITEM"
+const OPEN_PANEL_MESSAGE = "OPEN_PANEL"
+
+const LINK_CATEGORIES = {
+  AI:            ["claude.ai", "chat.openai.com", "gemini.google", "perplexity.ai", "cursor.sh", "v0.dev", "huggingface.co"],
+  Dev:           ["github.com", "stackoverflow.com", "codepen.io", "replit.com", "vercel.com", "netlify.com", "npmjs.com", "developer.mozilla"],
+  Education:     ["canvas", "blackboard", "moodle", "coursera.com", "udemy.com", ".edu", "khanacademy.org", "leetcode.com"],
+  Social:        ["instagram.com", "twitter.com", "x.com", "facebook.com", "reddit.com", "threads.net"],
+  Productivity:  ["notion.so", "docs.google.com", "drive.google.com", "figma.com", "linear.app", "mail.google.com", "airtable.com", "trello.com"],
+  Entertainment: ["youtube.com", "netflix.com", "spotify.com", "twitch.tv"],
+  News:          ["news.ycombinator.com", "techcrunch.com", "medium.com", "substack.com"],
+}
+
+function cleanLinkUrl(url) {
+  try {
+    const u = new URL(url)
+    return `${u.hostname}${u.pathname}`.replace(/\/$/, "")
+  } catch { return url }
+}
+
+function categorizeLinkUrl(url) {
+  try {
+    const hostname = new URL(url).hostname
+    for (const [category, patterns] of Object.entries(LINK_CATEGORIES)) {
+      if (patterns.some(p => hostname.includes(p) || url.includes(p))) return category
+    }
+  } catch {}
+  return "Other"
+}
+
+function shouldSkipLinkUrl(url) {
+  if (!url) return true
+  return (
+    url.startsWith("chrome://") ||
+    url.startsWith("chrome-extension://") ||
+    url.startsWith("about:") ||
+    url.includes("newtab") ||
+    url.startsWith("data:") ||
+    url.includes("localhost") ||
+    url.includes("127.0.0.1")
+  )
+}
+
+async function recordLink(url, title, favIconUrl) {
+  if (shouldSkipLinkUrl(url)) return
+  const category = categorizeLinkUrl(url)
+  const key = cleanLinkUrl(url)
+  let favicon
+  try {
+    favicon = favIconUrl || `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=32`
+  } catch { favicon = "" }
+
+  const stored = await chrome.storage.local.get("links")
+  const links = stored.links || {}
+
+  for (const [cat, items] of Object.entries(links)) {
+    const idx = items.findIndex(l => cleanLinkUrl(l.url) === key)
+    if (idx !== -1) {
+      const updated = {
+        ...items[idx],
+        title: title || items[idx].title,
+        favicon: favIconUrl || items[idx].favicon,
+        visits: (items[idx].visits || 0) + 1,
+        lastVisited: Date.now()
+      }
+      if (cat === category) {
+        links[cat][idx] = updated
+      } else {
+        links[cat].splice(idx, 1)
+        if (!links[category]) links[category] = []
+        links[category].push(updated)
+      }
+      await chrome.storage.local.set({ links })
+      return
+    }
+  }
+
+  if (!links[category]) links[category] = []
+  links[category].push({ url, title: title || key, favicon, visits: 1, lastVisited: Date.now() })
+  await chrome.storage.local.set({ links })
+}
+
+async function seedFromHistory() {
+  const startTime = Date.now() - 30 * 24 * 60 * 60 * 1000
+  try {
+    const items = await chrome.history.search({ text: "", startTime, maxResults: 2000 })
+    const stored = await chrome.storage.local.get("links")
+    const links = stored.links || {}
+
+    const existingKeys = new Set(
+      Object.values(links).flat().map(l => cleanLinkUrl(l.url))
+    )
+
+    for (const item of items) {
+      if (shouldSkipLinkUrl(item.url)) continue
+      const key = cleanLinkUrl(item.url)
+      if (existingKeys.has(key)) continue
+      const category = categorizeLinkUrl(item.url)
+      let favicon
+      try { favicon = `https://www.google.com/s2/favicons?domain=${new URL(item.url).hostname}&sz=32` } catch { continue }
+      if (!links[category]) links[category] = []
+      links[category].push({
+        url: item.url,
+        title: item.title || key,
+        favicon,
+        visits: item.visitCount || 1,
+        lastVisited: item.lastVisitTime || Date.now()
+      })
+      existingKeys.add(key)
+    }
+
+    await chrome.storage.local.set({ links })
+  } catch (e) {
+    console.error("History seeding failed:", e)
+  }
+}
+
+async function openPanelInTab(mode) {
+  try {
+    const [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
+    if (!activeTab?.id || !isInjectableUrl(activeTab.url)) return
+    try {
+      await chrome.tabs.sendMessage(activeTab.id, { type: OPEN_PANEL_MESSAGE, mode })
+    } catch (error) {
+      if (error?.message?.includes("Receiving end does not exist")) {
+        await chrome.scripting.executeScript({
+          target: { tabId: activeTab.id },
+          files: ["Readability.js", "content.js"]
+        })
+        await chrome.tabs.sendMessage(activeTab.id, { type: OPEN_PANEL_MESSAGE, mode })
+      } else {
+        throw error
+      }
+    }
+  } catch (error) {
+    console.error("Unable to open Ambi panel:", error)
+  }
+}
 const MINIMUM_DWELL_TIME_MS = 10_000
 const STATE_DEBOUNCE_MS = 200
 const INGEST_API_URL = "http://127.0.0.1:8000/ingest"
@@ -522,10 +659,14 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   void enqueueOperation(() => handleTabRemoved(tabId))
 })
 
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status !== "complete" || !tab.url || tab.incognito) return
+  void recordLink(tab.url, tab.title, tab.favIconUrl)
+})
+
 chrome.commands.onCommand.addListener((command) => {
-  if (command === "toggle-search-panel") {
-    void toggleSearchPanel()
-  }
+  if (command === "open-context") void openPanelInTab("context")
+  if (command === "open-links") void openPanelInTab("links")
 })
 
 chrome.runtime.onStartup.addListener(() => {
@@ -534,6 +675,7 @@ chrome.runtime.onStartup.addListener(() => {
 
 chrome.runtime.onInstalled.addListener(() => {
   void enqueueOperation(initializeTracking)
+  void seedFromHistory()
 })
 
 void enqueueOperation(initializeTracking)
