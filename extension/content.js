@@ -273,7 +273,10 @@ function dedupLinks(links) {
 // ── Panel DOM setup ───────────────────────────────────────────────────────────
 
 function ensurePanel() {
-  if (ambiPanelElements) return ambiPanelElements
+  if (ambiPanelElements) {
+    if (ambiPanelElements.root.isConnected) return ambiPanelElements
+    ambiPanelElements = null
+  }
 
   const root = document.createElement("div")
   root.id = "ambi-search-root"
