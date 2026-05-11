@@ -6,6 +6,59 @@ Everything runs on the user's machine. No cloud. No accounts.
 
 ---
 
+## Sub-agent routing
+
+Four agents live in `.claude/agents/`. Use them as follows.
+
+### Default feature chain
+
+When implementing a new feature or non-trivial bug fix, run this pipeline:
+
+```
+1. code-writer          (sequential — must finish first)
+        ↓
+2. security-auditor  +  test-writer    (parallel — no dependency between them)
+        ↓
+3. code-reviewer        (sequential — synthesizes output of steps 1 & 2)
+```
+
+### When to run in parallel
+
+Spawn agents in parallel when their tasks touch **different files with no output dependency**:
+
+- `security-auditor` and `test-writer` always run in parallel after `code-writer` — they both only read code-writer's output
+- Two independent `code-writer` tasks that touch disjoint files (e.g. a server change and an unrelated manifest change) can run in parallel
+- `code-reviewer` must always be last — it synthesizes findings from all prior agents
+
+### When to run sequentially
+
+Run agents sequentially when Task B needs Task A's output:
+
+- `code-writer` → `security-auditor` (auditor reads the finished code)
+- `code-writer` → `test-writer` (test-writer reads the finished code)
+- `{security-auditor + test-writer}` → `code-reviewer` (reviewer synthesizes both)
+
+### Quick-task shortcuts
+
+| Task | Agents |
+|---|---|
+| "Is this code secure?" | `security-auditor` only |
+| "Review this PR" | `security-auditor` + `code-reviewer` in parallel |
+| "Write tests for X" | `test-writer` only |
+| "Fix this bug" | `code-writer` → `code-reviewer` (skip security + tests for trivial fixes) |
+| "Add feature X" | Full chain: code-writer → [security-auditor + test-writer] → code-reviewer |
+
+### Agent file ownership
+
+| Agent | May write | Read-only |
+|---|---|---|
+| `code-writer` | `extension/background.js`, `extension/content.js`, `extension/manifest.json`, `extension/panel.css`, `server/main.py`, `server/db.py`, `server/embedding.py` | everything else |
+| `security-auditor` | nothing | all source files |
+| `test-writer` | `tests/**` | all source files |
+| `code-reviewer` | nothing | all source files + agent outputs |
+
+---
+
 ## How to start everything
 
 ```bash
