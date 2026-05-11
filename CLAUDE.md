@@ -259,6 +259,42 @@ User clicks × on a result
 
 ---
 
+## Testing
+
+### Run tests
+
+**Backend (Python):**
+```bash
+cd /Users/sashikantkumar/Desktop/ambi
+source ambivenv/bin/activate
+pip install -r server/requirements.txt   # first time only
+pytest tests/ -x -q --tb=short
+```
+
+**Extension / frontend (JS):**
+```bash
+npm install   # first time — installs vitest
+npm test      # runs: vitest run tests/
+```
+
+Test files live in `tests/`. Backend tests: `tests/test_*.py`. Extension unit tests: `tests/extension/test_*.js`.
+
+### Automated hook
+
+A PostToolUse hook in `.claude/settings.json` runs the relevant test suite automatically every time Claude writes or edits a source file. It bails on the first failure (`-x` for pytest, `--bail 1` for vitest). The hook is silent when the `tests/` directory doesn't exist yet.
+
+**Do not remove or disable the PostToolUse hook in `.claude/settings.json`.** It is the project's primary regression guard.
+
+### Agent rule: test-writer runs after code-writer
+
+On every new feature or non-trivial bug fix, `test-writer` runs after `code-writer` completes (see Sub-agent routing above). This is mandatory, not optional.
+
+### Playwright MCP
+
+The `playwright` MCP server is configured in `.claude/settings.json`. Use it for end-to-end testing of the Chrome extension UI when needed. Start it via Claude Code's MCP integration — it connects to a local Chrome instance.
+
+---
+
 ## GitHub
 
 `https://github.com/Sunny-ybe/Ambi.git` — main branch

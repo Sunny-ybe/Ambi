@@ -1,11 +1,17 @@
 :host {
   all: initial;
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  pointer-events: none;
 }
 
 .ambi-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 2147483646;
+  z-index: 2147483647;
+  pointer-events: auto;
   display: none;
   background: rgba(0, 0, 0, 0.65);
   backdrop-filter: blur(10px);
